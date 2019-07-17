@@ -471,3 +471,10 @@ AL2O3_EXTERN_C InputBasic_PadHandle InputBasic_PadCreate(InputBasic_ContextHandl
 AL2O3_EXTERN_C void InputBasic_PadDestroy(InputBasic_PadHandle handle) {
 	// ignore we destroy it when the context is
 }
+AL2O3_EXTERN_C void InputBasic_PlatformProcessMsg(InputBasic_ContextHandle handle, void* msg) {
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
+#if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
+	ctx->manager.HandleMessage(*(MSG*)msg);
+#endif
+}
