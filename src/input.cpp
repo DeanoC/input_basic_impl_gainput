@@ -255,7 +255,7 @@ gainput::PadButton InputBasicPadButtonToGAInput(InputBasic_PadButton button) {
 gainput::MouseButton InputBasicMouseAxisToGAInput(InputBasic_Axis axis) {
 	switch(axis) {
 	case InputBasis_Axis_X: return gainput::MouseButton::MouseAxisX;
-	case InputBasis_Axis_Y: return gainput::MouseButton::MouseAxisX;
+	case InputBasis_Axis_Y: return gainput::MouseButton::MouseAxisY;
 	case InputBasis_Axis_RightX:  return gainput::MouseButton::MouseAxisX;
 	case InputBasis_Axis_RightY:  return gainput::MouseButton::MouseAxisY;
 	default: return gainput::MouseButton::MouseAxisX;
@@ -281,6 +281,8 @@ typedef struct InputBasic_Context {
 
 	gainput::InputDeviceMouse* mouse;
 	gainput::InputDeviceKeyboard* keyboard;
+
+	uint32_t allocatedUserIdBlock;
 
 } InputBasic_Context;
 
@@ -328,76 +330,75 @@ AL2O3_EXTERN_C void InputBasic_Update(InputBasic_ContextHandle handle, double de
 	ctx->manager.Update((uint64_t) deltaTimeInMS);
 }
 
-AL2O3_EXTERN_C InputBasic_MapperHandle InputBasic_GetMapper(InputBasic_ContextHandle handle) {
-	auto ctx = (InputBasic_Context *) handle;
-	if (!ctx) return nullptr;
-
-	return (InputBasic_MapperHandle) &ctx->mapper;
-}
-
-AL2O3_EXTERN_C void InputBasic_MapToMouseButton(InputBasic_MapperHandle handle,
+AL2O3_EXTERN_C void InputBasic_MapToMouseButton(InputBasic_ContextHandle handle,
 																								uint32_t userId,
 																								InputBasic_MouseHandle mouse,
 																								InputBasic_MouseButton button) {
-	auto mapper = (gainput::InputMap *) handle;
+
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
 	auto gamouse = (gainput::InputDeviceMouse *) mouse;
-	if (!mapper || !gamouse)
+	if (!gamouse)
 		return;
 	auto mouseId = gamouse->GetDeviceId();
 
-	mapper->MapBool(userId, mouseId, InputBasicMouseButtonToGAInput(button));
+	ctx->mapper.MapBool(userId, mouseId, InputBasicMouseButtonToGAInput(button));
 }
 
-AL2O3_EXTERN_C void InputBasic_MapToKey(InputBasic_MapperHandle handle,
+AL2O3_EXTERN_C void InputBasic_MapToKey(InputBasic_ContextHandle handle,
 																				uint32_t userId,
 																				InputBasic_KeyboardHandle keyboard,
 																				InputBasic_Key key) {
-	auto mapper = (gainput::InputMap *) handle;
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
 	auto gakb = (gainput::InputDeviceKeyboard *) keyboard;
-	if (!mapper || !gakb)
+	if (!gakb)
 		return;
 	auto kbId = gakb->GetDeviceId();
 
-	mapper->MapBool(userId, kbId, InputBasicKeyToGAInput(key));
+	ctx->mapper.MapBool(userId, kbId, InputBasicKeyToGAInput(key));
 
 }
-AL2O3_EXTERN_C void InputBasic_MapToPadButton(InputBasic_MapperHandle handle,
+AL2O3_EXTERN_C void InputBasic_MapToPadButton(InputBasic_ContextHandle handle,
 																							uint32_t userId,
 																							InputBasic_PadHandle pad,
 																							InputBasic_PadButton button) {
-	auto mapper = (gainput::InputMap *) handle;
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
 	auto gapad = (gainput::InputDevicePad *)pad;
-	if (!mapper || !gapad)
+	if (!gapad)
 		return;
 	auto padId = gapad->GetDeviceId();
 
-	mapper->MapBool(userId, padId, InputBasicPadButtonToGAInput(button));
+	ctx->mapper.MapBool(userId, padId, InputBasicPadButtonToGAInput(button));
 }
 
-AL2O3_EXTERN_C void InputBasic_MapToMouseAxis(InputBasic_MapperHandle handle,
+AL2O3_EXTERN_C void InputBasic_MapToMouseAxis(InputBasic_ContextHandle handle,
 																							uint32_t userId,
 																							InputBasic_MouseHandle mouse,
 																							InputBasic_Axis axis) {
-	auto mapper = (gainput::InputMap *) handle;
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
 	auto gamouse = (gainput::InputDeviceMouse *) mouse;
-	if (!mapper || !gamouse)
+	if (!gamouse)
 		return;
 	auto mouseId = gamouse->GetDeviceId();
 
-	mapper->MapFloat(userId, mouseId, InputBasicMouseAxisToGAInput(axis));
+	ctx->mapper.MapFloat(userId, mouseId, InputBasicMouseAxisToGAInput(axis));
 }
 
-AL2O3_EXTERN_C void InputBasic_MapToPadAxis(InputBasic_MapperHandle handle,
+AL2O3_EXTERN_C void InputBasic_MapToPadAxis(InputBasic_ContextHandle handle,
 																						uint32_t userId,
 																						InputBasic_PadHandle pad,
 																						InputBasic_Axis axis) {
-	auto mapper = (gainput::InputMap *) handle;
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return;
 	auto gapad = (gainput::InputDevicePad *)pad;
-	if (!mapper || !gapad)
+	if (!gapad)
 		return;
 	auto padId = gapad->GetDeviceId();
 
-	mapper->MapFloat(userId, padId, InputBasicPadAxisToGAInput(axis));
+	ctx->mapper.MapFloat(userId, padId, InputBasicPadAxisToGAInput(axis));
 }
 
 AL2O3_EXTERN_C bool InputBasic_GetAsBool(InputBasic_ContextHandle handle, uint32_t userId) {
@@ -407,7 +408,7 @@ AL2O3_EXTERN_C bool InputBasic_GetAsBool(InputBasic_ContextHandle handle, uint32
 	return ctx->mapper.GetBool(userId);
 }
 
-AL2O3_EXTERN_C float InputBasic_GetAsFloat(InputBasic_MapperHandle handle, uint32_t userId) {
+AL2O3_EXTERN_C float InputBasic_GetAsFloat(InputBasic_ContextHandle handle, uint32_t userId) {
 	auto ctx = (InputBasic_Context *) handle;
 	if (!ctx) return 0.0f;
 
@@ -477,4 +478,13 @@ AL2O3_EXTERN_C void InputBasic_PlatformProcessMsg(InputBasic_ContextHandle handl
 #if AL2O3_PLATFORM == AL2O3_PLATFORM_WINDOWS
 	ctx->manager.HandleMessage(*(MSG*)msg);
 #endif
+}
+
+AL2O3_EXTERN_C uint32_t InputBasic_AllocateUserIdBlock(InputBasic_ContextHandle handle) {
+	auto ctx = (InputBasic_Context *) handle;
+	if (!ctx) return 0;
+
+	uint32_t blk = ctx->allocatedUserIdBlock;
+	ctx->allocatedUserIdBlock += 1000;
+	return blk;
 }
